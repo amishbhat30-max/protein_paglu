@@ -31,17 +31,41 @@ def get_cookies():
 
 
 def check_stock(url):
+    session = requests.Session()
+
+    headers = {
+        "User-Agent": "Mozilla/5.0",
+        "Accept-Language": "en-IN,en;q=0.9",
+    }
+
     try:
-        res = requests.get(url, headers=get_headers(), cookies=get_cookies(), timeout=10)
+        # Step 1: Load homepage to establish session
+        session.get("https://shop.amul.com/", headers=headers, timeout=10)
+
+        # Step 2: Set pincode cookie (more realistic)
+        session.cookies.set("pincode", PINCODE)
+
+        # Step 3: Fetch product page
+        res = session.get(url, headers=headers, timeout=10)
         soup = BeautifulSoup(res.text, "html.parser")
+
         text = soup.get_text().lower()
+
+        # DEBUG (important)
+        print("Checking:", url)
+        print("Snippet:", text[:500])
 
         if "sold out" in text or "notify me" in text:
             return False
-        return True
+
+        # Extra safety: ensure Add to Cart exists
+        if "add to cart" in text:
+            return True
+
+        return False
 
     except Exception as e:
-        print(f"Error checking {url}: {e}")
+        print(f"Error: {e}")
         return False
 
 
