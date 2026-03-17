@@ -8,6 +8,7 @@ on:
 jobs:
   check-stock:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
 
     steps:
       - name: Checkout
@@ -18,8 +19,10 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install deps
-        run: pip install requests beautifulsoup4
+      - name: Install dependencies
+        run: |
+          pip install requests playwright
+          playwright install chromium
 
       - name: Run script
         env:
