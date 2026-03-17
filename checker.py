@@ -32,7 +32,8 @@ def check_stock(alias):
     try:
         res = requests.get(url, params=params, headers=headers, cookies=cookies, timeout=10)
         data = res.json()
-
+        print("STATUS:", res.status_code)
+        print("TEXT:", res.text[:300])
         product = data["data"][0]
 
         available = product.get("available", 0)
