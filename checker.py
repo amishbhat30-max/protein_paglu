@@ -44,21 +44,27 @@ def set_pincode(page):
 
 
 def check_stock(context, name, url):
-    page = context.new_page()  # fresh page each time
+    page = context.new_page()
 
     try:
         page.goto(url, timeout=60000)
-        page.wait_for_timeout(4000)
+        page.wait_for_timeout(5000)
 
-        content = page.content().lower()
-
-        if "sold out" in content or "notify me" in content:
+        # Try to find "Notify Me" (out of stock)
+        notify_btn = page.locator("text=Notify Me")
+        if notify_btn.count() > 0:
             print(f"{name}: OUT OF STOCK")
             return False
 
-        if "add to cart" in content:
+        # Try to find "Add to Cart"
+        add_btn = page.locator("text=Add to Cart")
+        if add_btn.count() > 0:
             print(f"{name}: IN STOCK")
             return True
+
+        # Debug: print visible buttons
+        buttons = page.locator("button").all_text_contents()
+        print(f"{name}: BUTTONS →", buttons[:5])
 
         print(f"{name}: UNKNOWN")
         return False
