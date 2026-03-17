@@ -21,19 +21,40 @@ def check_stock(alias):
     }
 
     headers = {
-        "User-Agent": "Mozilla/5.0",
-        "accept": "application/json"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
+        "accept": "application/json, text/plain, */*",
+        "referer": "https://shop.amul.com/",
+        "origin": "https://shop.amul.com"
     }
 
-    cookies = {
-        "pincode": PINCODE
-    }
+    session = requests.Session()
 
     try:
-        res = requests.get(url, params=params, headers=headers, cookies=cookies, timeout=10)
-        data = res.json()
-        print("STATUS:", res.status_code)
-        print("TEXT:", res.text[:300])
+        # 🔥 STEP 1: Warmup request (important)
+        session.get("https://shop.amul.com/", headers=headers, timeout=10)
+
+        # 🔥 STEP 2: Actual API call
+        res = session.get(
+            url,
+            params=params,
+            headers=headers,
+            cookies={"pincode": PINCODE},
+            timeout=10
+        )
+
+        print("Status:", res.status_code)
+
+        if res.status_code != 200 or not res.text.strip():
+            print("Empty or bad response")
+            return False
+
+        # 🔥 SAFE JSON PARSE
+        try:
+            data = res.json()
+        except Exception:
+            print("Blocked response:", res.text[:200])
+            return False
+
         product = data["data"][0]
 
         available = product.get("available", 0)
