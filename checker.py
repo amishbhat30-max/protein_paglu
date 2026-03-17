@@ -23,21 +23,18 @@ def send_telegram(msg):
 def set_pincode(page):
     try:
         page.goto("https://shop.amul.com", timeout=60000)
-
-        # small wait instead of networkidle
         page.wait_for_timeout(3000)
 
-        # try clicking before typing (handles modal)
-        try:
-            page.click('input', timeout=3000)
-        except:
-            pass
+        # Fill pincode
+        page.locator("input").first.fill(PINCODE)
 
-        page.fill('input', PINCODE)
-        page.keyboard.press("Enter")
+        # Click Apply button
+        page.locator("text=Apply").click()
 
+        # Wait for modal to close
         page.wait_for_timeout(3000)
-        print("Pincode set")
+
+        print("Pincode set successfully")
 
     except Exception as e:
         print("Pincode setup failed:", e)
@@ -48,21 +45,19 @@ def check_stock(context, name, url):
 
     try:
         page.goto(url, timeout=60000)
-        page.wait_for_timeout(5000)
+        page.wait_for_timeout(4000)
 
-        # Try to find "Notify Me" (out of stock)
-        notify_btn = page.locator("text=Notify Me")
-        if notify_btn.count() > 0:
+        # OUT OF STOCK check
+        if page.locator("text=Notify").count() > 0:
             print(f"{name}: OUT OF STOCK")
             return False
 
-        # Try to find "Add to Cart"
-        add_btn = page.locator("text=Add to Cart")
-        if add_btn.count() > 0:
+        # IN STOCK check
+        if page.locator("text=Add to Cart").count() > 0:
             print(f"{name}: IN STOCK")
             return True
 
-        # Debug: print visible buttons
+        # Debug info (helps if site changes)
         buttons = page.locator("button").all_text_contents()
         print(f"{name}: BUTTONS →", buttons[:5])
 
@@ -82,14 +77,14 @@ def main():
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
-
         context = browser.new_context()
 
-        # set pincode once
+        # Set pincode once
         page = context.new_page()
         set_pincode(page)
         page.close()
 
+        # Check products
         for name, url in PRODUCTS.items():
             if check_stock(context, name, url):
                 alerts.append(f"✅ {name} IN STOCK\n{url}")
@@ -97,7 +92,7 @@ def main():
         browser.close()
 
     if alerts:
-        send_telegram("🚀 Amul Stock Available!\n\n" + "\n\n".join(alerts))
+        send_telegram("🚀 Amul Protein Shake Available!\n\n" + "\n\n".join(alerts))
     else:
         print("All out of stock.")
 
