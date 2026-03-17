@@ -11,8 +11,16 @@ PRODUCTS = {
     "Pack of 30": "amul-high-protein-blueberry-shake-200-ml-or-pack-of-30"
 }
 
-
 def check_stock(alias):
+    session = requests.Session()
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        "accept": "application/json, text/plain, */*",
+        "referer": "https://shop.amul.com/",
+        "origin": "https://shop.amul.com"
+    }
+
     url = "https://shop.amul.com/api/1/entity/ms.products"
 
     params = {
@@ -20,41 +28,27 @@ def check_stock(alias):
         "limit": 1
     }
 
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
-        "accept": "application/json, text/plain, */*",
-        "referer": "https://shop.amul.com/",
-        "origin": "https://shop.amul.com"
-    }
-
-    session = requests.Session()
-
     try:
-        # 🔥 STEP 1: Warmup request (important)
-        session.get("https://shop.amul.com/", headers=headers, timeout=10)
+        # 🔥 Step 1: Hit homepage (get cookies like jsessionid)
+        r1 = session.get("https://shop.amul.com/", headers=headers, timeout=10)
 
-        # 🔥 STEP 2: Actual API call
+        print("Homepage status:", r1.status_code)
+
+        # 🔥 Step 2: Now call API WITH session cookies
         res = session.get(
             url,
             params=params,
             headers=headers,
-            cookies={"pincode": PINCODE},
             timeout=10
         )
 
-        print("Status:", res.status_code)
+        print("API Status:", res.status_code)
 
-        if res.status_code != 200 or not res.text.strip():
-            print("Empty or bad response")
+        if res.status_code != 200:
+            print("Blocked:", res.text[:200])
             return False
 
-        # 🔥 SAFE JSON PARSE
-        try:
-            data = res.json()
-        except Exception:
-            print("Blocked response:", res.text[:200])
-            return False
-
+        data = res.json()
         product = data["data"][0]
 
         available = product.get("available", 0)
