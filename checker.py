@@ -1,82 +1,97 @@
+from playwright.sync_api import sync_playwright
 import requests
 import os
 
 PINCODE = os.environ.get("PINCODE")
-
-TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
+TOKEN = os.environ.get("TELEGRAM_TOKEN")
 CHAT_ID = os.environ.get("CHAT_ID")
 
 PRODUCTS = {
-    "Pack of 8": "amul-high-protein-blueberry-shake-200-ml-or-pack-of-8",
-    "Pack of 30": "amul-high-protein-blueberry-shake-200-ml-or-pack-of-30"
+    "Pack of 8": "https://shop.amul.com/en/product/amul-high-protein-blueberry-shake-200-ml-or-pack-of-8",
+    "Pack of 30": "https://shop.amul.com/en/product/amul-high-protein-blueberry-shake-200-ml-or-pack-of-30"
 }
 
-def check_stock(alias):
-    session = requests.Session()
 
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-        "accept": "application/json, text/plain, */*",
-        "referer": "https://shop.amul.com/",
-        "origin": "https://shop.amul.com"
-    }
-
-    url = "https://shop.amul.com/api/1/entity/ms.products"
-
-    params = {
-        "q": f'{{"alias":"{alias}"}}',
-        "limit": 1
-    }
-
+def send_telegram(msg):
     try:
-        # 🔥 Step 1: Hit homepage (get cookies like jsessionid)
-        r1 = session.get("https://shop.amul.com/", headers=headers, timeout=10)
+        url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+        requests.post(url, data={"chat_id": CHAT_ID, "text": msg}, timeout=10)
+    except Exception as e:
+        print("Telegram error:", e)
 
-        print("Homepage status:", r1.status_code)
 
-        # 🔥 Step 2: Now call API WITH session cookies
-        res = session.get(
-            url,
-            params=params,
-            headers=headers,
-            timeout=10
-        )
+def set_pincode(page):
+    try:
+        page.goto("https://shop.amul.com", timeout=60000)
 
-        print("API Status:", res.status_code)
+        # small wait instead of networkidle
+        page.wait_for_timeout(3000)
 
-        if res.status_code != 200:
-            print("Blocked:", res.text[:200])
-            return False
+        # try clicking before typing (handles modal)
+        try:
+            page.click('input', timeout=3000)
+        except:
+            pass
 
-        data = res.json()
-        product = data["data"][0]
+        page.fill('input', PINCODE)
+        page.keyboard.press("Enter")
 
-        available = product.get("available", 0)
-        quantity = product.get("inventory_quantity", 0)
-
-        print(f"{alias} → available: {available}, qty: {quantity}")
-
-        return available > 0 or quantity > 0
+        page.wait_for_timeout(3000)
+        print("Pincode set")
 
     except Exception as e:
-        print("Error:", e)
+        print("Pincode setup failed:", e)
+
+
+def check_stock(context, name, url):
+    page = context.new_page()  # fresh page each time
+
+    try:
+        page.goto(url, timeout=60000)
+        page.wait_for_timeout(4000)
+
+        content = page.content().lower()
+
+        if "sold out" in content or "notify me" in content:
+            print(f"{name}: OUT OF STOCK")
+            return False
+
+        if "add to cart" in content:
+            print(f"{name}: IN STOCK")
+            return True
+
+        print(f"{name}: UNKNOWN")
         return False
 
+    except Exception as e:
+        print(f"{name}: ERROR → {e}")
+        return False
 
-def send_telegram(message):
-    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    requests.post(url, data={"chat_id": CHAT_ID, "text": message})
+    finally:
+        page.close()
 
 
 def main():
     alerts = []
 
-    for name, alias in PRODUCTS.items():
-        if check_stock(alias):
-            alerts.append(f"✅ {name} IN STOCK\nhttps://shop.amul.com/en/product/{alias}")
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+
+        context = browser.new_context()
+
+        # set pincode once
+        page = context.new_page()
+        set_pincode(page)
+        page.close()
+
+        for name, url in PRODUCTS.items():
+            if check_stock(context, name, url):
+                alerts.append(f"✅ {name} IN STOCK\n{url}")
+
+        browser.close()
 
     if alerts:
-        send_telegram("🚀 Amul Protein Shake Available!\n\n" + "\n\n".join(alerts))
+        send_telegram("🚀 Amul Stock Available!\n\n" + "\n\n".join(alerts))
     else:
         print("All out of stock.")
 
